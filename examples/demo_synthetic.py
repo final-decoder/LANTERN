@@ -1,4 +1,4 @@
-"""Illustrate LANTERN on a synthetic response matrix."""
+"""Run the LANTERN pipeline end-to-end on a synthetic response matrix."""
 
 import numpy as np
 from lantern.fir import response_error_budget

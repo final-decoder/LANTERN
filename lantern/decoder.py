@@ -85,6 +85,58 @@ class MonotoneSplineDecoder:
         self.theta_ = result.x
         return self
 
+    def fit_cv(self, z, lo, hi, y, l2_grid=None, n_folds=5, seed=0,
+               max_iter=10000, lr=0.01):
+        """Select l2_lambda by K-fold CV, then refit on the full data.
+
+        The CV score is the worst-case endpoint loss on held-out folds.
+        Stratification is by outcome deciles so folds stay outcome-balanced.
+
+        Parameters
+        ----------
+        z, lo, hi, y : as in fit
+        l2_grid : sequence of float, optional
+            Defaults to a log-spaced grid from 1e-3 to 1e2.
+        n_folds : int
+        seed : int
+            Seed for fold assignment.
+        max_iter, lr : as in fit
+
+        Returns
+        -------
+        self
+            With ``self.l2_lambda`` set to the CV-selected value and
+            ``self.cv_scores_`` holding the per-grid-point mean losses.
+        """
+        if l2_grid is None:
+            l2_grid = np.logspace(-3, 2, 6)
+        z, lo, hi, y = map(lambda a: np.asarray(a, dtype=float), (z, lo, hi, y))
+
+        deciles = np.quantile(y, np.linspace(0, 1, 11))
+        fold_id = np.digitize(y, deciles[1:-1])
+        rng = np.random.default_rng(seed)
+        jitter = rng.permutation(len(y)) % n_folds
+        fold_id = (fold_id + jitter) % n_folds
+
+        self.cv_scores_ = {}
+        for lam in l2_grid:
+            fold_losses = []
+            for f in range(n_folds):
+                tr, te = fold_id != f, fold_id == f
+                candidate = MonotoneSplineDecoder(
+                    self.n_context, self.n_reserve, self.knots, l2_lambda=lam
+                )
+                candidate.fit(z[tr], lo[tr], hi[tr], y[tr],
+                              max_iter=max_iter, lr=lr)
+                fold_losses.append(
+                    worst_case_loss(candidate, z[te], lo[te], hi[te], y[te])
+                )
+            self.cv_scores_[lam] = float(np.mean(fold_losses))
+
+        best = min(self.cv_scores_, key=self.cv_scores_.get)
+        self.l2_lambda = best
+        return self.fit(z, lo, hi, y, max_iter=max_iter, lr=lr)
+
 
 def worst_case_loss(decoder, z, lo, hi, y):
     """Compute the convex worst-case endpoint objective on a batch."""

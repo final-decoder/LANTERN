@@ -169,3 +169,62 @@ def build_reserve_features(M_hat, epsilon, groups, tau):
 
     tightened = tighten_intervals(intervals, group_sets, k)
     return tightened, group_sets
+
+
+def tau_sensitivity(M_hat, epsilon, groups, taus):
+    """Scan the resolution parameter and collect feature curves.
+
+    For each tau in ``taus`` the full normalized interval set is rebuilt;
+    the returned arrays track, per output-set key, how the midpoint and
+    half-width of every interval vary with tau.
+
+    Parameters
+    ----------
+    M_hat : (n_regions, n_conditions) array
+    epsilon : (n_regions,) array
+    groups : list[list[int]]
+    taus : sequence of float
+
+    Returns
+    -------
+    mid : dict[str -> (len(taus),) array]
+    half_width : dict[str -> (len(taus),) array]
+    """
+    keys, mid, half_width = None, {}, {}
+    for tau in taus:
+        intervals, group_sets = build_reserve_features(M_hat, epsilon, groups, tau)
+        if keys is None:
+            keys = list(intervals.keys())
+        for key in keys:
+            lo, hi = intervals[key]
+            mid.setdefault(key, []).append(0.5 * (lo + hi))
+            half_width.setdefault(key, []).append(0.5 * (hi - lo))
+    mid = {k: np.asarray(v) for k, v in mid.items()}
+    half_width = {k: np.asarray(v) for k, v in half_width.items()}
+    return mid, half_width
+
+
+def leave_one_group_out_volumes(M, groups, tau):
+    """Reserve volume of every leave-one-group-out subset.
+
+    Complements the all-union features with a diagnostic view: for each
+    anatomical group g, the log-volume of the response restricted to the
+    remaining parcels, i.e. how much diversity survives without g.
+
+    Parameters
+    ----------
+    M : (n_regions, n_conditions) array
+    groups : list[list[int]]
+    tau : float
+
+    Returns
+    -------
+    volumes : dict[str -> float]
+        Keyed by the held-out group index (1-based), as in group names.
+    """
+    all_regions = set().union(*[set(g) for g in groups])
+    volumes = {}
+    for i, group in enumerate(groups):
+        complement = sorted(all_regions - set(group))
+        volumes[str(i + 1)] = reserve_log_volume(M, complement, tau)
+    return volumes
