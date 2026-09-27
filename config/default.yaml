@@ -1,0 +1,45 @@
+# Default hyperparameters.
+
+fir:
+  tr: 2.0                # repetition time in seconds
+  horizon: 40.0          # integration horizon in seconds
+  hrf_model: 'fir'       # first-level GLM uses per-condition FIR
+  drift_model: 'cosine'
+  high_pass: 0.01        # Hz
+
+anatomy:
+  n_parcels: 18
+  n_groups: 6
+  # Six anatomical groups over 18 prespecified parcels
+  # (Schaefer2018 atlas correspondences, lesion-masked).
+  groups:
+    - [0, 1, 2]
+    - [3, 4, 5]
+    - [6, 7, 8]
+    - [9, 10, 11]
+    - [12, 13, 14]
+    - [15, 16, 17]
+
+reserve:
+  tau: 0.25              # resolution parameter
+  n_bootstrap: 2000      # for response-error budgets
+  coverage: 0.95         # simultaneous operator-error event
+
+decoder:
+  knots: [0.0, 0.25, 0.5, 0.75]
+  l2_lambda: 1.0
+  learning_rate: 0.01
+  max_iter: 10000
+
+calibration:
+  alpha: 0.10            # target miscoverage
+  clip: [0.0, 100.0]     # WAB-AQ range
+
+outcome:
+  target: 'aq_6mo'       # six-month WAB-AQ
+  clinical_context:
+    - 'aq_baseline'
+    - 'age'
+    - 'time_post_stroke'
+    - 'lesion_volume'
+    - 'rehab_exposure'
